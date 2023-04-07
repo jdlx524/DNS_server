@@ -1,12 +1,5 @@
 import glob
-import socket
 import json
-
-port = 53
-ip = "127.0.0.1"
-# user will use that port to interpret DNS
-sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-sock.bind((ip, port))
 
 
 class dnsManager:
