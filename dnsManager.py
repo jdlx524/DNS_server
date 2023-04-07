@@ -6,23 +6,26 @@ class dnsManager:
     """
         use build response function to return response string
     """
-    zonedata = None
-    def __init__(self, data, zone_file):
+    zone_data = None
 
+    def __init__(self, data: bytes, zone_file: str):
         self.load_zones(zone_file)
         self.data = data
 
-    def load_zones(self, zone_file):
-        jsonzone = {}
-        zonefiles = glob.glob(f'{zone_file}*.zone')
-        for zone in zonefiles:
-            with open(zone) as zonedata:
-                data = json.load(zonedata)
-                zonename = data["$origin"]
-                jsonzone[zonename] = data
-        self.zonedata = jsonzone
+    def load_zones(self, zone_file: str):
+        """
+            use to initialize the zone_data value
+        """
+        json_zone = {}
+        zone_files = glob.glob(f'{zone_file}*.zone')
+        for zone in zone_files:
+            with open(zone) as zone_data:
+                data = json.load(zone_data)
+                zone_name = data["$origin"]
+                json_zone[zone_name] = data
+        self.zone_data = json_zone
 
-    def get_flags(self, flags):
+    def get_flags(self, flags: list):
         """
             manage flag part
             question: can value of variables like QR, AA be changed?
@@ -39,7 +42,7 @@ class dnsManager:
         return int(QR + Opcode + AA + TC + RD, 2).to_bytes(1, byteorder='big') + \
                int(RA + Z + RCODE, 2).to_bytes(1, byteorder='big')
 
-    def get_question_domain(self, question):
+    def get_question_domain(self, question: list):
         """
             manage question part
         """
@@ -60,10 +63,16 @@ class dnsManager:
         return name + '.' + suffix + '.', question_type, question[
                                                          :len_name + len_suffix + 3]
 
-    def get_zone(self, domain):
-        return self.zonedata[domain]
+    def get_zone(self, domain: str):
+        """
+            like get method of a dictionary
+        """
+        return self.zone_data.get(domain)
 
-    def get_recs(self, data):
+    def get_recs(self, data: list):
+        """
+            manage question part data
+        """
         domain, question_type, ini_code = self.get_question_domain(data)
         qt = ''
         if question_type == b'\x00\x01':
@@ -71,67 +80,62 @@ class dnsManager:
         zone = self.get_zone(domain)
         return zone[qt], qt, domain, ini_code
 
-    def build_question(self, rectype, ini_code):
+    def build_question(self, rec_type: str, ini_code: bytes):
+        """
+            build question query
+        """
         qbytes = ini_code
-
-        if rectype == 'a':
+        if rec_type == 'a':
             qbytes += (1).to_bytes(2, byteorder='big')
-
         qbytes += (1).to_bytes(2, byteorder='big')
 
         return qbytes
 
     def rectobytes(self, rectype, recttl, recval):
-
+        """
+            use records in zones to generate record part of response
+        """
         rbytes = b'\xc0\x0c'  # works for simple DNS server
-
         if rectype == 'a':
             rbytes = rbytes + bytes([0]) + bytes([1])
-
         rbytes = rbytes + bytes([0]) + bytes([1])
-
         rbytes += int(recttl).to_bytes(4, byteorder='big')
 
         if rectype == 'a':
             rbytes = rbytes + bytes([0]) + bytes([4])
-
             for part in recval.split('.'):
                 # part corresponding to one piece of ipv4
                 rbytes += bytes([int(part)])
         return rbytes
 
-    def build_response(self, data):
-        Transaction_ID = data[:2]
+    def build_response(self):
+        """
+            main part of managers, used to combine every single part and return final response
+        """
+        Transaction_ID = self.data[:2]
         TID = ''
-        # index of byte type data represents dec format of one bit
-        # print('data:', data)
+        # index of byte type self.data represents dec format of one bit
+        # print('self.data:', self.data)
         for byte in Transaction_ID:
             # print(byte, hex(byte))
             TID += hex(byte)[2:]
-        # print("TID:", TID)
 
-        flags = self.get_flags(data[2:4])
-        # print('flags:', flags)
+        flags = self.get_flags(self.data[2:4])
 
         QCOUNT = b'\x00\x01'
-        records, rectype, domain_name, ini_code = self.get_recs(data[12:])
+        records, rec_type, domain_name, ini_code = self.get_recs(self.data[12:])
         ANCOUNT = len(records).to_bytes(2, byteorder='big')
-
         # Nameserver Count
         NSCOUNT = (0).to_bytes(2, byteorder='big')
-
         # Additonal Count
         ARCOUNT = (0).to_bytes(2, byteorder='big')
-
-        dnsheader = Transaction_ID + flags + QCOUNT + ANCOUNT + NSCOUNT + ARCOUNT
-
+        dns_header = Transaction_ID + flags + QCOUNT + ANCOUNT + NSCOUNT + ARCOUNT
         # Create DNS body
-        dnsbody = b''
-
-        dnsquestion = self.build_question(rectype, ini_code)
-        print(dnsquestion)
+        dns_body = b''
+        dns_question = self.build_question(rec_type, ini_code)
+        # print(dns_question)
 
         for record in records:
-            dnsbody += self.rectobytes(rectype, record["ttl"], record["value"])
+            dns_body += self.rectobytes(rec_type, record["ttl"], record["value"])
 
-        return dnsheader + dnsquestion + dnsbody
+        return dns_header + dns_question + dns_body
