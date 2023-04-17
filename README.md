@@ -21,3 +21,9 @@ Z = '000'
 RCODE = '0000'
 ```
 They can also make difference. I think set default value can only be used in basic DNS_server.
+### some understanding about protocol introduced by RFC
+referred from: https://www.ietf.org/rfc/rfc1035.txt
+
+The official protocol parts include standard queries, responses and the Internet class RR data formats (e.g., host addresses).
+
+What I did for that project is based on that protocol. The message format is in part 4.1.
